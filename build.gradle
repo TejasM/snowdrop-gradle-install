@@ -1,3 +1,6 @@
+import org.gradle.api.file.FileTree;
+import org.gradle.api.internal.file.archive.ZipFileTree;
+
 /*
  * JBoss, Home of Professional Open Source.
  * Copyright 2011, Red Hat Middleware LLC, and individual contributors
@@ -45,7 +48,7 @@ versions = [jbossVfs3: '3.1.0.Final',jbossVfs2: '2.1.3.SP1', jbossMan: '2.1.0.GA
 		javaxResource: '1.0.0.Final',
 		ironjacamar: '1.0.4.Final',
 		jbossModules: '1.0.2.GA',
-		spring:'2.5.6.SEC02',
+		spring:'3.1.1.RELEASE',
 		jbossLogging:'2.1.0.GA',
 		jbossClassloader: '2.2.0.Alpha3',
 		javaxServlet: '2.3',
@@ -57,20 +60,7 @@ versions = [jbossVfs3: '3.1.0.Final',jbossVfs2: '2.1.3.SP1', jbossMan: '2.1.0.GA
 		aspectj: '1.6.8',
 		aopalliance:'1.0',
 		saxon:'8.7',
-		snowdrop:'2.0.3.Final']
-
-def springDependencies3 = [
-	[group:'org.springframework', name:'spring-core', version: versions.spring],
-	[group:'org.springframework', name:'spring-context', version: versions.spring],
-	[group:'org.springframework', name:'spring-webmvc', version: versions.spring],
-	[group:'org.springframework', name:'spring-jms', version: versions.spring],
-	[group:'org.springframework', name:'spring-aop', version: versions.spring],
-	[group:'org.springframework', name:'spring-asm', version: versions.spring],
-	[group:'org.springframework', name:'spring-beans', version: versions.spring],
-	[group:'org.springframework', name:'spring-context-support', version: versions.spring],
-	[group:'org.springframework', name:'spring-expression', version: versions.spring],
-	[group:'org.springframework', name:'spring-web', version: versions.spring],
-]
+		snowdrop:'2.0.4.Final']
 
 
 def springDependencies = []
@@ -91,7 +81,6 @@ dependencies{
 	snowdropDependencies group:'org.aspectj', name:'aspectjrt', version: versions.aspectj
 	snowdropDependencies group:'org.aspectj', name:'aspectjweaver', version:versions.aspectj
 	snowdropDependencies group:'aopalliance', name:'aopalliance', version:versions.aopalliance
-	snowdropDependencies group:'cglib', name:'cglib-nodep', version:'2.2.2'
 	xslt group:'net.sf.saxon', name:'saxon', version:versions.saxon
 }
 
@@ -111,26 +100,38 @@ install.doFirst(){
 	if (project.hasProperty("SPRING_VERSION")){
 		versions.spring  = "$SPRING_VERSION"
 	}
-	springDependencies = [
-		[group:'org.springframework', name:'spring-core', version: versions.spring],
-		[group:'org.springframework', name:'spring-context', version: versions.spring],
-		[group:'org.springframework', name:'spring-webmvc', version: versions.spring],
-		[group:'org.springframework', name:'spring-jms', version: versions.spring],
-		[group:'org.springframework', name:'spring-aop', version: versions.spring],
-		[group:'org.springframework', name:'spring-beans', version: versions.spring],
-		[group:'org.springframework', name:'spring-context-support', version: versions.spring],
-		[group:'org.springframework', name:'spring-web', version: versions.spring],
-	]
-	if (versions.spring.startsWith('3')){
-		springDependencies.add([group:'org.springframework', name:'spring-asm', version: versions.spring])
-		springDependencies.add([group:'org.springframework', name:'spring-expression', version: versions.spring])
-	}
 	if (project.hasProperty("SNOWDROP_VERSION")){
 		versions.snowdrop  = "$SNOWDROP_VERSION"
 	}
 	dependencies{		
 		snowdrop ('org.jboss.snowdrop:snowdrop-subsystem-as7:' + versions.snowdrop +'@zip'){
 			transitive = false
+		}
+		if (versions.spring.startsWith('2.5')){
+			snowdrop ('org.jboss.snowdrop:snowdrop-module-spring-2.5:' + versions.snowdrop +'@zip'){
+				transitive = false
+			}
+		}
+		if (versions.spring.startsWith('3.0')){
+			snowdrop ('org.jboss.snowdrop:snowdrop-module-spring-3:' + versions.snowdrop +'@zip'){
+				transitive = false
+			}
+		}
+		if (versions.spring.startsWith('3.1')){
+			snowdrop ('org.jboss.snowdrop:snowdrop-module-spring-3.1:' + versions.snowdrop +'@zip'){
+				transitive = false
+			}
+		}
+	}
+	def zipModule = configurations.snowdrop.filter { it.toString().endsWith(".zip") && it.toString().contains("snowdrop-module") }.singleFile
+	FileTree tree = zipTree(zipModule.getPath())
+	def moduleFile = tree.getSingleFile()
+	def springModules = []
+	def parsedModuleXml = (new XmlParser()).parse(moduleFile)
+	parsedModuleXml.resources[0].children().each { springModules.add(it.@path.replaceAll(".jar", "")) }
+	springModules.each {
+		if (it.startsWith("spring")){
+			springDependencies.add([group:'org.springframework', name:it.toString(), version: versions.spring])
 		}
 	}
 }
@@ -147,7 +148,7 @@ installSnowdrop.doFirst {
 		println it.toString()
 	}
 	copy{
-		configurations.snowdrop.filter { it.toString().endsWith(".zip") }.each{
+		configurations.snowdrop.filter { it.toString().endsWith(".zip")}.each{
 			from zipTree(it)
 		}
 		into jbossHome + '/modules'
@@ -171,13 +172,6 @@ installSpring.doFirst {
 		into project.jbossHome + '/modules/org/springframework/spring/snowdrop'
 		include '**/*.jar'
 	}
-	
-/*	copy {
-		jbossHome = "$System.env.JBOSS_HOME"
-		from 'subsystem-as7/modules/spring-' + ant.springVersion + '/src/main/module'
-		into jbossHome + '/modules/org/springframework/spring/snowdrop'
-		include '**//*.xml'
-	}*/
 }
 
 installSpring.doLast {
