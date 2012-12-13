@@ -20,6 +20,7 @@ else
 		sleep 1m
 		echo "Activating snowdrop on server"
 		$1/bin/jboss-cli.sh --controller=$ipaddr:9999 -c /extension=org.jboss.snowdrop:add
+		$1/bin/jboss-cli.sh --controller=$ipaddr:9999 -c /profile=default/subsystem=spring:add
 		for i in `ps -ef| awk '$3 == '$PID' { print $2 }'`
 		do
 			kill -9 $i
